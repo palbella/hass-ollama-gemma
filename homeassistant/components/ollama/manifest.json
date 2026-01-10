@@ -1,18 +1,19 @@
 {
-  "domain": "ollama_gemma",
+  "domain": "ollama",
   "name": "Ollama Gemma",
+  "version": "1.0.0",
   "after_dependencies": [
     "assist_pipeline",
     "intent"
   ],
   "codeowners": [
-    "@synesthesiam"
+    "@palbella"
   ],
   "config_flow": true,
   "dependencies": [
     "conversation"
   ],
-  "documentation": "https://www.home-assistant.io/integrations/ollama",
+  "documentation": "https://github.com/palbella/hass-ollama-gemma",
   "integration_type": "service",
   "iot_class": "local_polling",
   "requirements": [
