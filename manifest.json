@@ -1,5 +1,5 @@
 {
-  "domain": "ollama",
+  "domain": "ollama_gemma",
   "name": "Ollama Gemma",
   "version": "1.0.0",
   "after_dependencies": [
