@@ -43,6 +43,8 @@ from .const import (
     CONF_KEEP_ALIVE,
     CONF_MAX_HISTORY,
     CONF_MODEL,
+    CONF_FUNCTION_MODEL,
+    CONF_NUM_CTX,
     CONF_NUM_CTX,
     CONF_PROMPT,
     CONF_THINK,
@@ -162,14 +164,21 @@ class OllamaConfigFlow(ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_MODEL): SelectSelector(
                         SelectSelectorConfig(options=models_to_list, custom_value=True)
-                    )
+                    ),
+                    vol.Required(CONF_FUNCTION_MODEL): SelectSelector(
+                        SelectSelectorConfig(options=models_to_list, custom_value=True)
+                    ),
                 }
             )
             return self.async_show_form(step_id="pick_model", data_schema=schema)
 
         return self.async_create_entry(
             title=self.url,
-            data={CONF_URL: self.url, CONF_MODEL: user_input[CONF_MODEL]},
+            data={
+                CONF_URL: self.url,
+                CONF_MODEL: user_input[CONF_MODEL],
+                CONF_FUNCTION_MODEL: user_input[CONF_FUNCTION_MODEL],
+            },
         )
 
     @classmethod

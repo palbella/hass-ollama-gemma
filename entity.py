@@ -215,6 +215,11 @@ class OllamaBaseLLMEntity(Entity):
                 for tool in chat_log.llm_api.tools
             ]
 
+        # Select model: Use function_model if tools are available/active, else use standard model
+        model = settings[CONF_MODEL]
+        if tools and settings.get(CONF_FUNCTION_MODEL):
+             model = settings[CONF_FUNCTION_MODEL]
+
         message_history: MessageHistory = MessageHistory(
             [_convert_content(content) for content in chat_log.content]
         )
@@ -239,8 +244,8 @@ class OllamaBaseLLMEntity(Entity):
                 response_generator = await client.chat(
                     model=model,
                     # Make a copy of the messages because we mutate the list later
-                    messages=list(message_history.messages),
-                    tools=tools,
+                    messages=list(message_history.messages), # type: ignore
+                    tools=tools, # type: ignore
                     stream=True,
                     # keep_alive requires specifying unit. In this case, seconds
                     keep_alive=f"{settings.get(CONF_KEEP_ALIVE, DEFAULT_KEEP_ALIVE)}s",

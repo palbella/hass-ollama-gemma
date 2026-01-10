@@ -25,6 +25,8 @@ from .const import (
     CONF_KEEP_ALIVE,
     CONF_MAX_HISTORY,
     CONF_MODEL,
+    CONF_FUNCTION_MODEL,
+    CONF_NUM_CTX,
     CONF_NUM_CTX,
     CONF_PROMPT,
     CONF_THINK,
@@ -80,10 +82,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> bo
 
         if not has_conversation:
             model = entry.data[CONF_MODEL]
+            function_model = entry.data.get(CONF_FUNCTION_MODEL) # Might not be present in old entries
+            
+            subentry_data = {CONF_MODEL: model}
+            if function_model:
+                subentry_data[CONF_FUNCTION_MODEL] = function_model
+
             hass.config_entries.async_add_subentry(
                 entry,
                 ConfigSubentry(
-                    data=MappingProxyType({CONF_MODEL: model}),
+                    data=MappingProxyType(subentry_data),
                     subentry_type="conversation",
                     title=model,
                     unique_id=None,

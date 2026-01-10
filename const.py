@@ -5,6 +5,7 @@ DOMAIN = "ollama_gemma"
 DEFAULT_NAME = "Ollama Gemma"
 
 CONF_MODEL = "model"
+CONF_FUNCTION_MODEL = "function_model"
 CONF_PROMPT = "prompt"
 CONF_THINK = "think"
 

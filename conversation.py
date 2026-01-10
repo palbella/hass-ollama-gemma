@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import OllamaConfigEntry
-from .const import CONF_PROMPT, DOMAIN
+from .const import CONF_PROMPT, DOMAIN, CONF_MODEL, CONF_FUNCTION_MODEL
 from .entity import OllamaBaseLLMEntity
 
 import logging
