@@ -14,6 +14,10 @@ from . import OllamaConfigEntry
 from .const import CONF_PROMPT, DOMAIN
 from .entity import OllamaBaseLLMEntity
 
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -70,6 +74,10 @@ class OllamaConversationEntity(
     ) -> conversation.ConversationResult:
         """Call the API."""
         settings = {**self.entry.data, **self.subentry.data}
+
+        _LOGGER.debug("Variable user_input tiene el valor: %s", user_input)
+        _LOGGER.debug("Variable chat_log tiene el valor: %s", chat_log)
+        _LOGGER.error("Algo salió mal en la conexión")
 
         try:
             await chat_log.async_provide_llm_data(
