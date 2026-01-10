@@ -70,6 +70,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> bo
         raise ConfigEntryNotReady(err) from err
 
     entry.runtime_data = client
+    
+    # If we have a model in the entry data (from initial setup), create a conversation subentry
+    if CONF_MODEL in entry.data:
+        has_conversation = any(
+            sub.subentry_type == "conversation"
+            for sub in entry.subentries.values()
+        )
+
+        if not has_conversation:
+            model = entry.data[CONF_MODEL]
+            hass.config_entries.async_add_subentry(
+                entry,
+                ConfigSubentry(
+                    data=MappingProxyType({CONF_MODEL: model}),
+                    subentry_type="conversation",
+                    title=model,
+                    unique_id=None,
+                ),
+            )
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(async_update_options))
