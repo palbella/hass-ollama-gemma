@@ -175,6 +175,59 @@ async def _transform_stream(
         yield chunk
 
 
+async def _buffered_json_transform_stream(
+    result: AsyncIterator[ollama.ChatResponse],
+) -> AsyncGenerator[conversation.AssistantContentDeltaDict]:
+    """Buffer the stream, parse JSON, and yield tool calls if applicable."""
+    full_content = ""
+    async for response in result:
+        if (content := response["message"].get("content")) is not None:
+            full_content += content
+
+    _LOGGER.debug("Buffered content from function model: %s", full_content)
+
+    # Attempt to parse JSON
+    try:
+        # cleanup markdown code blocks if any
+        clean_content = full_content.strip()
+        if clean_content.startswith("```json"):
+            clean_content = clean_content[7:]
+        if clean_content.startswith("```"):
+            clean_content = clean_content[3:]
+        if clean_content.endswith("```"):
+            clean_content = clean_content[:-3]
+        clean_content = clean_content.strip()
+
+        data = json.loads(clean_content)
+        
+        # Check if it looks like a tool call (name and parameters/arguments)
+        if isinstance(data, dict) and "name" in data:
+            tool_name = data["name"]
+            tool_args = data.get("parameters", data.get("arguments", {}))
+            
+            _LOGGER.info("Parsed tool call from JSON: %s(%s)", tool_name, tool_args)
+            
+            yield {
+                "role": "assistant",
+                "tool_calls": [
+                    llm.ToolInput(
+                        tool_name=tool_name,
+                        tool_args=_fix_invalid_arguments(tool_args),
+                    )
+                ],
+            }
+            return
+
+    except json.JSONDecodeError:
+        _LOGGER.warning("Failed to parse JSON from function model response")
+
+    # If parsing failed or not a tool call, yield as text
+    yield {
+        "role": "assistant",
+        "content": full_content,
+    }
+
+
 class OllamaBaseLLMEntity(Entity):
     """Ollama base LLM entity."""
 
@@ -206,25 +259,44 @@ class OllamaBaseLLMEntity(Entity):
         settings = {**self.entry.data, **self.subentry.data}
 
         client = self.entry.runtime_data
-        model = settings[CONF_MODEL]
-
+        
         tools: list[dict[str, Any]] | None = None
+        tool_schemas = []
         if chat_log.llm_api:
-            tools = [
-                _format_tool(tool, chat_log.llm_api.custom_serializer)
-                for tool in chat_log.llm_api.tools
-            ]
+            tools = []
+            for tool in chat_log.llm_api.tools:
+                t = _format_tool(tool, chat_log.llm_api.custom_serializer)
+                tools.append(t)
+                tool_schemas.append(t)
 
         # Select model: Use function_model if tools are available/active, else use standard model
         model = settings[CONF_MODEL]
+        use_function_model = False
         if tools and settings.get(CONF_FUNCTION_MODEL):
              model = settings[CONF_FUNCTION_MODEL]
+             use_function_model = True
 
         message_history: MessageHistory = MessageHistory(
             [_convert_content(content) for content in chat_log.content]
         )
         max_messages = int(settings.get(CONF_MAX_HISTORY, DEFAULT_MAX_HISTORY))
         self._trim_history(message_history, max_messages)
+
+        # Inject system prompt for function model (Force JSON)
+        if use_function_model:
+            system_prompt = (
+                "You are an AI assistant capable of calling tools. "
+                "The available tools are defined below in JSON schema format:\n\n"
+                f"{json.dumps(tool_schemas, indent=2)}\n\n"
+                "To call a tool, verify the tool name and arguments usage, simply respond with a JSON object containing the `name` of the tool and its `parameters`. "
+                "Do not add any explanation, markdown formatting, or extra text. Just the JSON object.\n"
+                "Example: {\"name\": \"tool_name\", \"parameters\": {\"arg1\": \"value1\"}}"
+            )
+            
+            if message_history.messages and message_history.messages[0]["role"] == "system":
+                 message_history.messages[0]["content"] += f"\n\n{system_prompt}"
+            else:
+                message_history.messages.insert(0, ollama.Message(role="system", content=system_prompt))
 
         output_format: dict[str, Any] | None = None
         if structure:
@@ -241,11 +313,15 @@ class OllamaBaseLLMEntity(Entity):
         # To prevent infinite loops, we limit the number of iterations
         for _iteration in range(MAX_TOOL_ITERATIONS):
             try:
+                # If using function model manual mode, we DO NOT pass `tools` to Ollama API
+                # because we are handling it via prompt and parsing.
+                api_tools = tools if not use_function_model else None
+
                 response_generator = await client.chat(
                     model=model,
                     # Make a copy of the messages because we mutate the list later
                     messages=list(message_history.messages), # type: ignore
-                    tools=tools, # type: ignore
+                    tools=api_tools, # type: ignore
                     stream=True,
                     # keep_alive requires specifying unit. In this case, seconds
                     keep_alive=f"{settings.get(CONF_KEEP_ALIVE, DEFAULT_KEEP_ALIVE)}s",
@@ -259,11 +335,16 @@ class OllamaBaseLLMEntity(Entity):
                     f"Sorry, I had a problem talking to the Ollama server: {err}"
                 ) from err
 
+            # Select stream transformer
+            transformer = _transform_stream
+            if use_function_model:
+                transformer = _buffered_json_transform_stream
+
             message_history.messages.extend(
                 [
                     _convert_content(content)
                     async for content in chat_log.async_add_delta_content_stream(
-                        self.entity_id, _transform_stream(response_generator)
+                        self.entity_id, transformer(response_generator)
                     )
                 ]
             )
