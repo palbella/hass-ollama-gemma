@@ -235,7 +235,7 @@ async def async_migrate_integration(hass: HomeAssistant) -> None:
 
 async def async_migrate_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> bool:
     """Migrate entry."""
-    _LOGGER.debug("Migrating from version %s:%s", entry.version, entry.minor_version)
+    _LOGGER.debug("Pablo: Migrating from version %s:%s", entry.version, entry.minor_version)
 
     if entry.version > 3:
         # This means the user has downgraded from a future version
@@ -311,7 +311,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> 
         hass.config_entries.async_update_entry(entry, minor_version=3)
 
     _LOGGER.debug(
-        "Migration to version %s:%s successful", entry.version, entry.minor_version
+        "Pablo: Migration to version %s:%s successful", entry.version, entry.minor_version
     )
 
     return True

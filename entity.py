@@ -153,7 +153,7 @@ async def _transform_stream(
 
     new_msg = True
     async for response in result:
-        _LOGGER.debug("Received response: %s", response)
+        _LOGGER.debug("Pablo: Received response: %s", response)
         response_message = response["message"]
         chunk: conversation.AssistantContentDeltaDict = {}
         if new_msg:
@@ -185,7 +185,7 @@ async def _buffered_json_transform_stream(
         if (content := response["message"].get("content")) is not None:
             full_content += content
 
-    _LOGGER.debug("Buffered content from function model: %s", full_content)
+    _LOGGER.debug("Pablo: Buffered content from function model: %s", full_content)
 
     # Attempt to parse JSON
     try:
@@ -283,6 +283,7 @@ class OllamaBaseLLMEntity(Entity):
         max_messages = int(settings.get(CONF_MAX_HISTORY, DEFAULT_MAX_HISTORY))
         self._trim_history(message_history, max_messages)
 
+        _LOGGER.debug("Pablo: Variable tool_schemas tiene el valor: %s", tool_schemas)
         # Inject system prompt for function model (Force JSON)
         if use_function_model:
             system_prompt = (
@@ -309,7 +310,11 @@ class OllamaBaseLLMEntity(Entity):
                     else llm.selector_serializer
                 ),
             )
-
+        
+        _LOGGER.debug("Pablo: Usando modelo: %s", model)
+        _LOGGER.debug("Pablo: Herramientas disponibles (tools): %s", tools)
+        _LOGGER.debug("Pablo: Historial de mensajes final: %s", message_history.messages)
+        
         # Get response
         # To prevent infinite loops, we limit the number of iterations
         for _iteration in range(MAX_TOOL_ITERATIONS):

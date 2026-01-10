@@ -75,9 +75,8 @@ class OllamaConversationEntity(
         """Call the API."""
         settings = {**self.entry.data, **self.subentry.data}
 
-        _LOGGER.debug("Variable user_input tiene el valor: %s", user_input)
-        _LOGGER.debug("Variable chat_log tiene el valor: %s", chat_log)
-        _LOGGER.error("Algo salió mal en la conexión")
+        _LOGGER.debug("Pablo: Variable user_input tiene el valor: %s", user_input)
+        _LOGGER.debug("Pablo: Variable chat_log tiene el valor: %s", chat_log)
 
         try:
             await chat_log.async_provide_llm_data(
@@ -89,6 +88,11 @@ class OllamaConversationEntity(
         except conversation.ConverseError as err:
             return err.as_conversation_result()
 
+        if chat_log.llm_api:
+            _LOGGER.debug("Pablo: API LLM Tools (Entidades): %s", chat_log.llm_api.tools)
+
         await self._async_handle_chat_log(chat_log)
 
-        return conversation.async_get_result_from_chat_log(user_input, chat_log)
+        result = conversation.async_get_result_from_chat_log(user_input, chat_log)
+        _LOGGER.debug("Pablo: Resultado final: %s", result)
+        return result
