@@ -267,3 +267,19 @@ class OllamaBaseLLMEntity(Entity):
                      } for tc in (last_msg.get("tool_calls") or [])
                  ] if last_msg.get("tool_calls") else None
             }, default=str)
+        
+         # DEBUG: Capture final response for inspection
+        if message_history.messages:
+            last_msg = message_history.messages[-1]
+            pablo_final_response2 = json.dumps({
+                "role": last_msg.get("role"),
+                "content": last_msg.get("content"),
+                "tool_calls": [
+                     {
+                         "function": {
+                             "name": tc.function.name,
+                             "arguments": tc.function.arguments
+                         }
+                     } for tc in (last_msg.get("tool_calls") or [])
+                 ] if last_msg.get("tool_calls") else None
+            }, default=str)
