@@ -195,7 +195,7 @@ class OllamaBaseLLMEntity(Entity):
 
         model = settings[CONF_MODEL]
         use_function_model = False
-        if tools and settings.get(CONF_MODEL) #CONF_FUNCTION_MODEL:
+        if tools and settings.get(CONF_MODEL): # CONF_FUNCTION_MODEL
              model = settings[CONF_MODEL]
              use_function_model = True
 
@@ -267,4 +267,3 @@ class OllamaBaseLLMEntity(Entity):
                      } for tc in (last_msg.get("tool_calls") or [])
                  ] if last_msg.get("tool_calls") else None
             }, default=str)
-     model = settings[CONF_MODEL]
