@@ -142,7 +142,6 @@ async def _buffered_json_transform_stream(
             full_content += content
 
     clean_content = full_content.strip()
-    # Limpieza profunda de markdown y texto basura
     if "```" in clean_content:
         clean_content = clean_content.split("```")[1]
         if clean_content.startswith("json"):
@@ -196,9 +195,11 @@ class OllamaBaseLLMEntity(Entity):
 
         model = settings[CONF_MODEL]
         use_function_model = False
-        if tools and settings.get(CONF_FUNCTION_MODEL):
-             model = settings[CONF_FUNCTION_MODEL]
+        if tools and settings.get(CONF_MODEL) #CONF_FUNCTION_MODEL:
+             model = settings[CONF_MODEL]
              use_function_model = True
+
+        # Hasta aqui el modelo a usar es functiongemma en model.
 
         message_history = MessageHistory([_convert_content(content) for content in chat_log.content])
         
@@ -213,6 +214,23 @@ class OllamaBaseLLMEntity(Entity):
                  message_history.messages[0]["content"] += f"\n\n{system_prompt}"
             else:
                 message_history.messages.insert(0, ollama.Message(role="system", content=system_prompt))
+
+        # DEBUG: Capture request for inspection
+        nuevo_pablo_request = json.dumps([
+             {
+                 "role": m.get("role"),
+                 "content": m.get("content"),
+                 "tool_calls": [
+                     {
+                         "function": {
+                             "name": tc.function.name,
+                             "arguments": tc.function.arguments
+                         }
+                     } for tc in (m.get("tool_calls") or [])
+                 ] if m.get("tool_calls") else None
+             }
+             for m in message_history.messages
+        ], default=str)
 
         for _ in range(MAX_TOOL_ITERATIONS):
             response_generator = await client.chat(
@@ -233,3 +251,20 @@ class OllamaBaseLLMEntity(Entity):
             ])
             if not chat_log.unresponded_tool_results:
                 break
+        
+        # DEBUG: Capture final response for inspection
+        if message_history.messages:
+            last_msg = message_history.messages[-1]
+            pablo_final_response = json.dumps({
+                "role": last_msg.get("role"),
+                "content": last_msg.get("content"),
+                "tool_calls": [
+                     {
+                         "function": {
+                             "name": tc.function.name,
+                             "arguments": tc.function.arguments
+                         }
+                     } for tc in (last_msg.get("tool_calls") or [])
+                 ] if last_msg.get("tool_calls") else None
+            }, default=str)
+     model = settings[CONF_MODEL]
