@@ -88,20 +88,20 @@ def _parse_tool_args(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _extract_json(text: str) -> dict[str, Any] | None:
     """Extract and validate JSON tool call from text."""
-    # Look for something that looks like target JSON: {"action": "...", "parameters": {...}}
-    # We use a non-greedy match for the action part and handle nested braces for parameters
-    match = re.search(r'(\{.*"action"\s*:\s*".*"\s*,\s*"parameters"\s*:\s*\{.*\}\s*\})', text, re.DOTALL)
-    if not match:
-        # Fallback to any JSON-like structure if the template is not strictly followed
-        match = re.search(r'(\{.*\})', text, re.DOTALL)
-    
-    if match:
-        try:
-            data = json.loads(match.group(1))
+    # Use a regex that looks specifically for the 'action' and 'parameters' pattern
+    # but is flexible with whitespace and quotes.
+    # We try to find the outermost matching braces.
+    try:
+        # Find the start of the first { and the end of the last }
+        start = text.find('{')
+        end = text.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            json_str = text[start:end+1]
+            data = json.loads(json_str)
             if isinstance(data, dict) and "action" in data:
                 return data
-        except (json.JSONDecodeError, TypeError):
-            pass
+    except (json.JSONDecodeError, TypeError):
+        pass
     return None
 
 
@@ -195,7 +195,6 @@ async def _transform_stream(
         
         # Text content handling (including ReAct parsing)
         if (content := response_message.get("content")) is not None:
-            chunk["content"] = content
             if tool_call_type == TOOL_CALL_TYPE_REACT and not action_sent:
                 accumulated_content += content
                 if action := _extract_json(accumulated_content):
@@ -206,6 +205,13 @@ async def _transform_stream(
                             tool_args=_parse_tool_args(action.get("parameters", {})),
                         )
                     ]
+                    # If it's a tool call, we don't want to show the JSON to the user as content
+                    # We'll clear any content we might have started sending if it was part of the JSON
+                    chunk["content"] = "" 
+                else:
+                    chunk["content"] = content
+            else:
+                chunk["content"] = content
         
         if (thinking := response_message.get("thinking")) is not None:
             chunk["thinking_content"] = thinking
@@ -297,6 +303,7 @@ class OllamaBaseLLMEntity(Entity):
         # Get response
         # To prevent infinite loops, we limit the number of iterations
         for _iteration in range(MAX_TOOL_ITERATIONS):
+            _LOGGER.info("Ollama Request [%s]: %s", model, [m.get("content") for m in message_history.messages])
             try:
                 response_generator = await client.chat(
                     model=model,

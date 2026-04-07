@@ -463,7 +463,7 @@ def ollama_config_option_schema(
             vol.Optional(
                 CONF_THINK,
                 description={
-                    "suggested_value": options.get("think", DEFAULT_THINK),
+                    "suggested_value": options.get(CONF_THINK, DEFAULT_THINK),
                 },
             ): BooleanSelector(),
             vol.Optional(
@@ -476,14 +476,8 @@ def ollama_config_option_schema(
             ): SelectSelector(
                 SelectSelectorConfig(
                     options=[
-                        SelectOptionDict(
-                            label="Native (Classic)",
-                            value=TOOL_CALL_TYPE_NATIVE,
-                        ),
-                        SelectOptionDict(
-                            label="ReAct (Prompt-based)",
-                            value=TOOL_CALL_TYPE_REACT,
-                        ),
+                        {"label": "Native (Classic)", "value": TOOL_CALL_TYPE_NATIVE},
+                        {"label": "ReAct (Prompt-based)", "value": TOOL_CALL_TYPE_REACT},
                     ],
                     mode=SelectSelectorConfig.Mode.DROPDOWN,
                 )
