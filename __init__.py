@@ -25,8 +25,6 @@ from .const import (
     CONF_KEEP_ALIVE,
     CONF_MAX_HISTORY,
     CONF_MODEL,
-    CONF_FUNCTION_MODEL,
-    CONF_NUM_CTX,
     CONF_NUM_CTX,
     CONF_PROMPT,
     CONF_THINK,
@@ -52,7 +50,7 @@ __all__ = [
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = (Platform.AI_TASK, Platform.CONVERSATION)
 
-type OllamaConfigEntry = ConfigEntry[ollama.AsyncClient]
+OllamaConfigEntry = ConfigEntry[ollama.AsyncClient]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -82,11 +80,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> bo
 
         if not has_conversation:
             model = entry.data[CONF_MODEL]
-            function_model = entry.data.get(CONF_FUNCTION_MODEL) # Might not be present in old entries
             
             subentry_data = {CONF_MODEL: model}
-            if function_model:
-                subentry_data[CONF_FUNCTION_MODEL] = function_model
 
             hass.config_entries.async_add_subentry(
                 entry,

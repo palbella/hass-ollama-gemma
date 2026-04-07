@@ -5,7 +5,6 @@ DOMAIN = "ollama_gemma"
 DEFAULT_NAME = "Ollama Gemma"
 
 CONF_MODEL = "model"
-CONF_FUNCTION_MODEL = "function_model"
 CONF_PROMPT = "prompt"
 CONF_THINK = "think"
 
@@ -159,7 +158,7 @@ MODEL_NAMES = [  # https://ollama.com/library
     "yi",
     "zephyr",
 ]
-DEFAULT_MODEL = "qwen3:4b"
+DEFAULT_MODEL = "gemma3:4b"
 
 DEFAULT_CONVERSATION_NAME = "Ollama Conversation"
 DEFAULT_AI_TASK_NAME = "Ollama AI Task"
