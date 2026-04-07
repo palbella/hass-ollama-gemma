@@ -25,6 +25,8 @@ from .const import (
     CONF_KEEP_ALIVE,
     CONF_MAX_HISTORY,
     CONF_MODEL,
+    CONF_FUNCTION_MODEL,
+    CONF_NUM_CTX,
     CONF_NUM_CTX,
     CONF_PROMPT,
     CONF_THINK,
@@ -70,6 +72,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> bo
         raise ConfigEntryNotReady(err) from err
 
     entry.runtime_data = client
+    
+    # If we have a model in the entry data (from initial setup), create a conversation subentry
+    if CONF_MODEL in entry.data:
+        has_conversation = any(
+            sub.subentry_type == "conversation"
+            for sub in entry.subentries.values()
+        )
+
+        if not has_conversation:
+            model = entry.data[CONF_MODEL]
+            function_model = entry.data.get(CONF_FUNCTION_MODEL) # Might not be present in old entries
+            
+            subentry_data = {CONF_MODEL: model}
+            if function_model:
+                subentry_data[CONF_FUNCTION_MODEL] = function_model
+
+            hass.config_entries.async_add_subentry(
+                entry,
+                ConfigSubentry(
+                    data=MappingProxyType(subentry_data),
+                    subentry_type="conversation",
+                    title=model,
+                    unique_id=None,
+                ),
+            )
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(async_update_options))
@@ -207,7 +235,7 @@ async def async_migrate_integration(hass: HomeAssistant) -> None:
 
 async def async_migrate_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> bool:
     """Migrate entry."""
-    _LOGGER.debug("Migrating from version %s:%s", entry.version, entry.minor_version)
+    _LOGGER.debug("Pablo: Migrating from version %s:%s", entry.version, entry.minor_version)
 
     if entry.version > 3:
         # This means the user has downgraded from a future version
@@ -283,7 +311,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> 
         hass.config_entries.async_update_entry(entry, minor_version=3)
 
     _LOGGER.debug(
-        "Migration to version %s:%s successful", entry.version, entry.minor_version
+        "Pablo: Migration to version %s:%s successful", entry.version, entry.minor_version
     )
 
     return True

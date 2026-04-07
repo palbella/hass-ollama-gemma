@@ -43,6 +43,8 @@ from .const import (
     CONF_KEEP_ALIVE,
     CONF_MAX_HISTORY,
     CONF_MODEL,
+    CONF_FUNCTION_MODEL,
+    CONF_NUM_CTX,
     CONF_NUM_CTX,
     CONF_PROMPT,
     CONF_THINK,
@@ -127,9 +129,56 @@ class OllamaConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors=errors,
             )
 
+        self.url = url
+        return await self.async_step_pick_model()
+
+    async def async_step_pick_model(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the model selection step."""
+        if user_input is None:
+            client = ollama.AsyncClient(host=self.url, verify=get_default_context())
+            try:
+                async with asyncio.timeout(DEFAULT_TIMEOUT):
+                    response = await client.list()
+            except Exception:
+                _LOGGER.exception("Unexpected exception")
+                return self.async_abort(reason="unknown")
+
+            models = sorted(
+                model["model"] for model in response.get("models", [])
+            )
+            
+            # If no models found, use default or let user type? 
+            # For now let's just show what we have + standard ones
+            models_to_list = [
+                SelectOptionDict(label=f"{m} (downloaded)", value=m)
+                for m in models
+            ] + [
+                SelectOptionDict(label=m, value=f"{m}:latest")
+                for m in sorted(MODEL_NAMES)
+                if m not in models
+            ]
+
+            schema = vol.Schema(
+                {
+                    vol.Required(CONF_MODEL): SelectSelector(
+                        SelectSelectorConfig(options=models_to_list, custom_value=True)
+                    ),
+                    vol.Required(CONF_FUNCTION_MODEL): SelectSelector(
+                        SelectSelectorConfig(options=models_to_list, custom_value=True)
+                    ),
+                }
+            )
+            return self.async_show_form(step_id="pick_model", data_schema=schema)
+
         return self.async_create_entry(
-            title=url,
-            data={CONF_URL: url},
+            title=self.url,
+            data={
+                CONF_URL: self.url,
+                CONF_MODEL: user_input[CONF_MODEL],
+                CONF_FUNCTION_MODEL: user_input[CONF_FUNCTION_MODEL],
+            },
         )
 
     @classmethod
