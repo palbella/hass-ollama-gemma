@@ -447,7 +447,7 @@ def ollama_config_option_schema(
                 },
             ): NumberSelector(
                 NumberSelectorConfig(
-                    min=0, max=sys.maxsize, step=1, mode=NumberSelectorMode.BOX
+                    min=0, max=sys.maxsize, step=1, mode="box"
                 )
             ),
             vol.Optional(
@@ -457,7 +457,7 @@ def ollama_config_option_schema(
                 },
             ): NumberSelector(
                 NumberSelectorConfig(
-                    min=-1, max=sys.maxsize, step=1, mode=NumberSelectorMode.BOX
+                    min=-1, max=sys.maxsize, step=1, mode="box"
                 )
             ),
             vol.Optional(
@@ -479,7 +479,7 @@ def ollama_config_option_schema(
                         {"label": "Native (Classic)", "value": TOOL_CALL_TYPE_NATIVE},
                         {"label": "ReAct (Prompt-based)", "value": TOOL_CALL_TYPE_REACT},
                     ],
-                    mode=SelectSelectorConfig.Mode.DROPDOWN,
+                    mode="dropdown",
                 )
             ),
         }
