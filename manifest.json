@@ -1,6 +1,6 @@
 {
   "domain": "ollama_gemma",
-  "name": "Ollama",
+  "name": "Ollama Gemma",
   "after_dependencies": ["assist_pipeline", "intent"],
   "codeowners": ["@synesthesiam"],
   "config_flow": true,
