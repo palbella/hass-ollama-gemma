@@ -1,5 +1,5 @@
 {
-  "domain": "ollama",
+  "domain": "ollama_gemma",
   "name": "Ollama",
   "after_dependencies": ["assist_pipeline", "intent"],
   "codeowners": ["@synesthesiam"],
