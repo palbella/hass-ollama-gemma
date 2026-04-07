@@ -7,6 +7,11 @@ DEFAULT_NAME = "Ollama Gemma"
 CONF_MODEL = "model"
 CONF_PROMPT = "prompt"
 CONF_THINK = "think"
+CONF_TOOL_CALL_TYPE = "tool_call_type"
+
+TOOL_CALL_TYPE_NATIVE = "native"
+TOOL_CALL_TYPE_REACT = "react"
+DEFAULT_TOOL_CALL_TYPE = TOOL_CALL_TYPE_REACT
 
 CONF_KEEP_ALIVE = "keep_alive"
 DEFAULT_KEEP_ALIVE = -1  # seconds. -1 = indefinite, 0 = never
@@ -166,3 +171,17 @@ DEFAULT_AI_TASK_NAME = "Ollama AI Task"
 RECOMMENDED_CONVERSATION_OPTIONS = {
     CONF_MAX_HISTORY: DEFAULT_MAX_HISTORY,
 }
+
+REACT_SYSTEM_PROMPT = """You are a voice assistant for Home Assistant.
+
+If you need to perform an action using a tool, respond ONLY with the tool call in the following JSON format:
+{"action": "tool_name", "parameters": {"arg1": "val1", ...}}
+
+DO NOT include any text, reasoning, or commentary before or after the JSON when you are calling a tool.
+If you are NOT perform an action (e.g. answering a general question or reporting a result), respond with natural language.
+
+After you call a tool, you will receive an "Observation" with the result. Use this result to continue or provide a final answer.
+
+AVAILABLE TOOLS:
+{tools_list}
+"""

@@ -46,6 +46,7 @@ from .const import (
     CONF_NUM_CTX,
     CONF_PROMPT,
     CONF_THINK,
+    CONF_TOOL_CALL_TYPE,
     DEFAULT_AI_TASK_NAME,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_KEEP_ALIVE,
@@ -53,11 +54,14 @@ from .const import (
     DEFAULT_MODEL,
     DEFAULT_NUM_CTX,
     DEFAULT_THINK,
+    DEFAULT_TOOL_CALL_TYPE,
     DEFAULT_TIMEOUT,
     DOMAIN,
     MAX_NUM_CTX,
     MIN_NUM_CTX,
     MODEL_NAMES,
+    TOOL_CALL_TYPE_NATIVE,
+    TOOL_CALL_TYPE_REACT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -462,6 +466,28 @@ def ollama_config_option_schema(
                     "suggested_value": options.get("think", DEFAULT_THINK),
                 },
             ): BooleanSelector(),
+            vol.Optional(
+                CONF_TOOL_CALL_TYPE,
+                description={
+                    "suggested_value": options.get(
+                        CONF_TOOL_CALL_TYPE, DEFAULT_TOOL_CALL_TYPE
+                    )
+                },
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        SelectOptionDict(
+                            label="Native (Classic)",
+                            value=TOOL_CALL_TYPE_NATIVE,
+                        ),
+                        SelectOptionDict(
+                            label="ReAct (Prompt-based)",
+                            value=TOOL_CALL_TYPE_REACT,
+                        ),
+                    ],
+                    mode=SelectSelectorConfig.Mode.DROPDOWN,
+                )
+            ),
         }
     )
 

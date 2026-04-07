@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, AsyncIterator, Callable
 import json
 import logging
+import re
 from typing import Any
 
 import ollama
@@ -24,10 +25,13 @@ from .const import (
     CONF_MODEL,
     CONF_NUM_CTX,
     CONF_THINK,
+    CONF_TOOL_CALL_TYPE,
     DEFAULT_KEEP_ALIVE,
     DEFAULT_MAX_HISTORY,
     DEFAULT_NUM_CTX,
     DOMAIN,
+    REACT_SYSTEM_PROMPT,
+    TOOL_CALL_TYPE_REACT,
 )
 from .models import MessageHistory, MessageRole
 
@@ -82,18 +86,45 @@ def _parse_tool_args(arguments: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _extract_json(text: str) -> dict[str, Any] | None:
+    """Extract and validate JSON tool call from text."""
+    # Look for something that looks like target JSON: {"action": "...", "parameters": {...}}
+    # We use a non-greedy match for the action part and handle nested braces for parameters
+    match = re.search(r'(\{.*"action"\s*:\s*".*"\s*,\s*"parameters"\s*:\s*\{.*\}\s*\})', text, re.DOTALL)
+    if not match:
+        # Fallback to any JSON-like structure if the template is not strictly followed
+        match = re.search(r'(\{.*\})', text, re.DOTALL)
+    
+    if match:
+        try:
+            data = json.loads(match.group(1))
+            if isinstance(data, dict) and "action" in data:
+                return data
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return None
+
+
 def _convert_content(
     chat_content: (
         conversation.Content
         | conversation.ToolResultContent
         | conversation.AssistantContent
     ),
+    tool_call_type: str | None = None,
 ) -> ollama.Message:
     """Create tool response content."""
     if isinstance(chat_content, conversation.ToolResultContent):
+        content = json.dumps(chat_content.tool_result)
+        if tool_call_type == TOOL_CALL_TYPE_REACT:
+            # In ReAct mode, observations are fed back as user messages or special formats
+            return ollama.Message(
+                role=MessageRole.USER.value,
+                content=f"Observation: {content}",
+            )
         return ollama.Message(
             role=MessageRole.TOOL.value,
-            content=json.dumps(chat_content.tool_result),
+            content=content,
         )
     if isinstance(chat_content, conversation.AssistantContent):
         return ollama.Message(
@@ -135,29 +166,24 @@ def _convert_content(
 
 async def _transform_stream(
     result: AsyncIterator[ollama.ChatResponse],
+    tool_call_type: str | None = None,
 ) -> AsyncGenerator[conversation.AssistantContentDeltaDict]:
-    """Transform the response stream into HA format.
-
-    An Ollama streaming response may come in chunks like this:
-
-    response: message=Message(role="assistant", content="Paris")
-    response: message=Message(role="assistant", content=".")
-    response: message=Message(role="assistant", content=""), done: True, done_reason: "stop"
-    response: message=Message(role="assistant", tool_calls=[...])
-    response: message=Message(role="assistant", content=""), done: True, done_reason: "stop"
-
-    This generator conforms to the chatlog delta stream expectations in that it
-    yields deltas, then the role only once the response is done.
-    """
+    """Transform the response stream into HA format."""
 
     new_msg = True
+    accumulated_content = ""
+    action_sent = False
+    
     async for response in result:
         _LOGGER.debug("Received response: %s", response)
         response_message = response["message"]
         chunk: conversation.AssistantContentDeltaDict = {}
+        
         if new_msg:
             new_msg = False
             chunk["role"] = "assistant"
+        
+        # Native tool calling
         if (tool_calls := response_message.get("tool_calls")) is not None:
             chunk["tool_calls"] = [
                 llm.ToolInput(
@@ -166,12 +192,29 @@ async def _transform_stream(
                 )
                 for tool_call in tool_calls
             ]
+        
+        # Text content handling (including ReAct parsing)
         if (content := response_message.get("content")) is not None:
             chunk["content"] = content
+            if tool_call_type == TOOL_CALL_TYPE_REACT and not action_sent:
+                accumulated_content += content
+                if action := _extract_json(accumulated_content):
+                    action_sent = True
+                    chunk["tool_calls"] = [
+                        llm.ToolInput(
+                            tool_name=action["action"],
+                            tool_args=_parse_tool_args(action.get("parameters", {})),
+                        )
+                    ]
+        
         if (thinking := response_message.get("thinking")) is not None:
             chunk["thinking_content"] = thinking
+        
         if response_message.get("done"):
             new_msg = True
+            accumulated_content = ""
+            action_sent = False
+            
         yield chunk
 
 
@@ -215,9 +258,28 @@ class OllamaBaseLLMEntity(Entity):
                 for tool in chat_log.llm_api.tools
             ]
 
+        tool_call_type = settings.get(CONF_TOOL_CALL_TYPE)
+
         message_history: MessageHistory = MessageHistory(
-            [_convert_content(content) for content in chat_log.content]
+            [_convert_content(content, tool_call_type) for content in chat_log.content]
         )
+        
+        # ReAct Prompt Manipulation
+        if tool_call_type == TOOL_CALL_TYPE_REACT and tools:
+            # Build tools list for prompt
+            tools_desc = "\n".join([
+                f"- {t['function']['name']}: {t['function'].get('description', '')}. parameters: {json.dumps(t['function']['parameters'])}"
+                for t in tools
+            ])
+            react_prompt = REACT_SYSTEM_PROMPT.format(tools_list=tools_desc)
+            
+            # Prefix the existing history with our React instructions if it doesn't have it yet
+            if not any(react_prompt in m.get("content", "") for m in message_history.messages):
+                message_history.messages.insert(0, ollama.Message(role=MessageRole.SYSTEM.value, content=react_prompt))
+            
+            # Disable native tool calling
+            tools = None
+
         max_messages = int(settings.get(CONF_MAX_HISTORY, DEFAULT_MAX_HISTORY))
         self._trim_history(message_history, max_messages)
 
@@ -256,9 +318,9 @@ class OllamaBaseLLMEntity(Entity):
 
             message_history.messages.extend(
                 [
-                    _convert_content(content)
+                    _convert_content(content, tool_call_type)
                     async for content in chat_log.async_add_delta_content_stream(
-                        self.entity_id, _transform_stream(response_generator)
+                        self.entity_id, _transform_stream(response_generator, tool_call_type)
                     )
                 ]
             )
