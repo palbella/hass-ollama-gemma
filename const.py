@@ -177,7 +177,7 @@ REACT_SYSTEM_PROMPT = """You are a voice assistant for Home Assistant.
 ### Protocol:
 1. If you need to perform an action (turn on lights, set temperature, etc.), you MUST respond with a JSON object.
 2. The JSON object MUST follow this EXACT format:
-   {"action": "tool_name", "parameters": {"arg1": "val1", ...}}
+   {{ "action": "tool_name", "parameters": {{ "arg1": "val1", ... }} }}
 3. When outputting JSON for an action, DO NOT include any other text (no "Thought:", no "Action:", no reasoning). Respond ONLY with the JSON.
 
 ### Available Tools:

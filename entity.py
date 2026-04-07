@@ -252,7 +252,7 @@ class OllamaBaseLLMEntity(Entity):
         structure: vol.Schema | None = None,
     ) -> None:
         """Generate an answer for the chat log."""
-        settings = {**self.entry.data, **self.subentry.data}
+        settings = {**self.entry.data, **self.entry.options, **self.subentry.data}
 
         client = self.entry.runtime_data
         model = settings[CONF_MODEL]
@@ -264,19 +264,26 @@ class OllamaBaseLLMEntity(Entity):
                 for tool in chat_log.llm_api.tools
             ]
 
-        tool_call_type = settings.get(CONF_TOOL_CALL_TYPE)
+        tool_call_type = settings.get(CONF_TOOL_CALL_TYPE, TOOL_CALL_TYPE_REACT)
+        _LOGGER.warning("[DEBUG] Active Tool Call Type: %s", tool_call_type)
 
         message_history: MessageHistory = MessageHistory(
             [_convert_content(content, tool_call_type) for content in chat_log.content]
         )
         
         # ReAct Prompt Manipulation
-        if tool_call_type == TOOL_CALL_TYPE_REACT and tools:
+        if tool_call_type == TOOL_CALL_TYPE_REACT:
             # Build tools list for prompt
-            tools_desc = "\n".join([
-                f"- {t['function']['name']}: {t['function'].get('description', '')}. parameters: {json.dumps(t['function']['parameters'])}"
-                for t in tools
-            ])
+            if tools:
+                tools_desc = "\n".join([
+                    f"- {t['function']['name']}: {t['function'].get('description', '')}. parameters: {json.dumps(t['function']['parameters'])}"
+                    for t in tools
+                ])
+                _LOGGER.warning("ReAct Tools Available: %d", len(tools))
+            else:
+                tools_desc = "No tools available. Do not try to perform any actions."
+                _LOGGER.warning("ReAct Tools Available: 0 (The model will not be able to perform actions!)")
+            
             react_prompt = REACT_SYSTEM_PROMPT.format(tools_list=tools_desc)
             
             # Prefix the existing history with our React instructions if it doesn't have it yet
@@ -303,7 +310,7 @@ class OllamaBaseLLMEntity(Entity):
         # Get response
         # To prevent infinite loops, we limit the number of iterations
         for _iteration in range(MAX_TOOL_ITERATIONS):
-            _LOGGER.info("Ollama Request [%s]: %s", model, [m.get("content") for m in message_history.messages])
+            _LOGGER.warning("Ollama Request [%s] (Check Logs): %s", model, [m.get("content") for m in message_history.messages])
             try:
                 response_generator = await client.chat(
                     model=model,
