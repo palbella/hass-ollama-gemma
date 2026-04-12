@@ -8,6 +8,7 @@ CONF_MODEL = "model"
 CONF_PROMPT = "prompt"
 CONF_THINK = "think"
 CONF_TOOL_CALL_TYPE = "tool_call_type"
+CONF_API_KEY = "api_key"
 
 TOOL_CALL_TYPE_NATIVE = "native"
 TOOL_CALL_TYPE_REACT = "react"
@@ -16,8 +17,9 @@ DEFAULT_TOOL_CALL_TYPE = TOOL_CALL_TYPE_REACT
 CONF_KEEP_ALIVE = "keep_alive"
 DEFAULT_KEEP_ALIVE = -1  # seconds. -1 = indefinite, 0 = never
 
+CONF_API_KEY = "api_key"
 KEEP_ALIVE_FOREVER = -1
-DEFAULT_TIMEOUT = 5.0  # seconds
+DEFAULT_TIMEOUT = 180.0  # seconds
 
 CONF_NUM_CTX = "num_ctx"
 DEFAULT_NUM_CTX = 8192

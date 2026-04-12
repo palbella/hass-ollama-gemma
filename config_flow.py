@@ -40,6 +40,7 @@ from homeassistant.util.ssl import get_default_context
 
 from . import OllamaConfigEntry
 from .const import (
+    CONF_API_KEY,
     CONF_KEEP_ALIVE,
     CONF_MAX_HISTORY,
     CONF_MODEL,
@@ -71,6 +72,9 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_URL): TextSelector(
             TextSelectorConfig(type=TextSelectorType.URL)
+        ),
+        vol.Optional(CONF_API_KEY): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
         ),
     }
 )
@@ -113,7 +117,11 @@ class OllamaConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         try:
-            client = ollama.AsyncClient(host=url, verify=get_default_context())
+            headers = {}
+            if api_key := user_input.get(CONF_API_KEY):
+                headers["Authorization"] = f"Bearer {api_key}"
+                
+            client = ollama.AsyncClient(host=url, verify=get_default_context(), headers=headers)
             async with asyncio.timeout(DEFAULT_TIMEOUT):
                 await client.list()
         except (TimeoutError, httpx.ConnectError):
@@ -132,6 +140,7 @@ class OllamaConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         self.url = url
+        self.api_key = user_input.get(CONF_API_KEY)
         return await self.async_step_pick_model()
 
     async def async_step_pick_model(
@@ -139,7 +148,11 @@ class OllamaConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle the model selection step."""
         if user_input is None:
-            client = ollama.AsyncClient(host=self.url, verify=get_default_context())
+            headers = {}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            
+            client = ollama.AsyncClient(host=self.url, verify=get_default_context(), headers=headers)
             try:
                 async with asyncio.timeout(DEFAULT_TIMEOUT):
                     response = await client.list()
@@ -176,6 +189,7 @@ class OllamaConfigFlow(ConfigFlow, domain=DOMAIN):
             data={
                 CONF_URL: self.url,
                 CONF_MODEL: user_input[CONF_MODEL],
+                CONF_API_KEY: self.api_key,
             },
         )
 
